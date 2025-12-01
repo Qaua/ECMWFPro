@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>ULGI PRO MAX | Ultimate Edition</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@100;300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg: #000000;
+    --glass: rgba(28, 28, 30, 0.6);
+    --border: rgba(255, 255, 255, 0.1);
+    --text: #ffffff;
+    
+    /* ҚАТАҢ ТҮСТЕР ЖҮЙЕСІ */
+    --safe: #30d158;   /* 🟢 Қалыпты */
+    --warn: #ffd60a;   /* 🟡 Ескерту (4.5м/с+, -20C) */
+    --danger: #ff453a; /* 🔴 Қауіпті (10м/с+, -30C) */
+    
+    --radius: 24px;
+  }
+
+  body { margin: 0; font-family: 'SF Pro Display', sans-serif; background: var(--bg); color: var(--text); padding-bottom: 60px; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
+
+  /* Артқы фон анимациясы (Yowindow style) */
+  #bg-layer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -2; background: linear-gradient(180deg, #1c1c1e 0%, #000000 100%); transition: background 1.5s ease; }
+  #weatherCanvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
+
+  .app { max-width: 500px; margin: 0 auto; padding: 16px; position: relative; z-index: 1; }
+
+  /* Header */
+  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .loc-wrap { position: relative; font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 8px; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+  select { position: absolute; opacity: 0; width: 100%; height: 100%; top:0; left:0; }
+  .model-badge { font-size:10px; font-weight:800; background:rgba(255,255,255,0.1); padding:5px 10px; border-radius:20px; border: 1px solid var(--safe); color: var(--safe); }
+
+  /* Цитаталар (Нобель) */
+  .quote-box { background: rgba(0,0,0,0.3); border-radius: 16px; padding: 12px 16px; margin-bottom: 20px; border-left: 3px solid var(--safe); backdrop-filter: blur(10px); }
+  .quote-text { font-style: italic; font-size: 12px; opacity: 0.9; line-height: 1.4; }
+  .quote-author { font-size: 10px; font-weight: 700; margin-top: 6px; text-transform: uppercase; color: var(--safe); text-align: right; }
+
+  /* Hero: Not Boring Weather */
+  .hero { text-align: center; margin: 10px 0 25px; }
+  .hero-temp { font-size: 96px; font-weight: 100; letter-spacing: -4px; line-height: 1; text-shadow: 0 0 40px rgba(255,255,255,0.1); }
+  .hero-cond { font-size: 18px; font-weight: 600; text-transform: capitalize; margin-top: 5px; }
+  .witty-text { font-size: 14px; font-weight: 500; color: var(--warn); margin-top: 8px; background: rgba(0,0,0,0.4); display: inline-block; padding: 6px 12px; border-radius: 12px; }
+
+  /* Apple Sun Arc */
+  .sun-card { background: var(--glass); border-radius: var(--radius); padding: 15px; margin-bottom: 15px; border: 1px solid var(--border); position: relative; overflow: hidden; }
+  .sun-info { display: flex; justify-content: space-between; font-size: 14px; font-weight: 600; margin-top: 5px; }
+  .sun-label { font-size: 10px; opacity: 0.6; text-transform: uppercase; }
+
+  /* Stats Grid */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+  .stat-card { background: var(--glass); backdrop-filter: blur(20px); border: 1px solid var(--border); border-radius: var(--radius); padding: 15px; display: flex; flex-direction: column; justify-content: space-between; transition: 0.3s; }
+  
+  /* Статус шекаралары */
+  .b-safe { border-bottom: 3px solid var(--safe); }
+  .b-warn { border-bottom: 3px solid var(--warn); box-shadow: 0 0 15px rgba(255, 214, 10, 0.1); }
+  .b-danger { border-bottom: 3px solid var(--danger); box-shadow: 0 0 15px rgba(255, 69, 58, 0.2); }
+
+  .stat-head { font-size: 11px; color: rgba(255,255,255,0.6); text-transform: uppercase; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+  .stat-val { font-size: 22px; font-weight: 700; margin: 6px 0 2px; }
+  .stat-desc { font-size: 11px; line-height: 1.2; font-weight: 500; opacity: 0.9; }
+
+  /* 24H Carrot Style */
+  .section-title { font-size: 12px; font-weight: 800; opacity: 0.6; text-transform: uppercase; margin: 20px 0 10px; letter-spacing: 0.5px; padding-left: 5px; }
+  .h-scroll { display: flex; overflow-x: auto; gap: 8px; padding-bottom: 10px; }
+  .h-scroll::-webkit-scrollbar { display: none; }
+  .h-card { min-width: 65px; background: rgba(255,255,255,0.05); border-radius: 16px; padding: 10px 5px; display: flex; flex-direction: column; align-items: center; text-align: center; border: 1px solid transparent; position: relative; }
+  .trend-arrow { font-size: 10px; margin-bottom: 3px; }
+
+  /* 7 Day List */
+  .d-list { background: var(--glass); border-radius: var(--radius); padding: 5px 20px; border: 1px solid var(--border); }
+  .d-row { display: flex; flex-direction: column; padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .d-row:last-child { border-bottom: none; }
+  .d-main { display: flex; justify-content: space-between; align-items: center; }
+  .d-extra { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; opacity: 0.8; }
+  .temp-box { background: rgba(255,255,255,0.1); padding: 3px 8px; border-radius: 6px; font-weight: 600; font-size: 13px; margin-left: 5px; }
+
+  /* Map */
+  #map { height: 220px; width: 100%; border-radius: var(--radius); margin-top: 5px; z-index: 0; cursor: pointer; }
+  .map-overlay { position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 4px 8px; border-radius: 8px; font-size: 10px; z-index: 400; pointer-events: none; }
+
+  /* Текст түстері */
+  .c-safe { color: var(--safe); }
+  .c-warn { color: var(--warn); }
+  .c-danger { color: var(--danger); }
+
+</style>
+</head>
+<body>
+
+<div id="bg-layer"></div>
+<canvas id="weatherCanvas"></canvas>
+
+<div class="app">
+  
+  <div class="header">
+    <div class="loc-wrap">
+      <i class="fas fa-location-dot" style="color:var(--safe)"></i>
+      <span id="locName">Өлгий</span>
+      <select id="locSelect"></select>
+    </div>
+    <div class="model-badge" id="modelBadge">ECMWF</div>
+  </div>
+
+  <div class="quote-box">
+    <div class="quote-text" id="quoteTxt">...</div>
+    <div class="quote-author" id="quoteAuth"></div>
+  </div>
+
+  <div class="hero">
+    <div class="hero-temp" id="curTemp">--°</div>
+    <div class="hero-cond" id="curCond">Жүктелуде...</div>
+    <div class="witty-text" id="wittyTxt">Ауа райын тексеруде...</div>
+    <div style="font-size:13px; opacity:0.6; margin-top:5px;">Сезілетіні: <span id="feelsLike">--</span>°</div>
+  </div>
+
+  <div class="sun-card">
+    <div class="stat-head" style="margin-bottom:10px;"><i class="far fa-sun"></i> Күн Доғасы</div>
+    <canvas id="sunCanvas" width="300" height="100" style="width:100%; height:auto;"></canvas>
+    <div class="sun-info">
+        <div><span class="sun-label">Шығуы</span><br><span id="sunrise">--:--</span></div>
+        <div style="text-align:right;"><span class="sun-label">Батуы</span><br><span id="sunset">--:--</span></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="stat-card" id="windCard">
+      <div class="stat-head"><i class="fas fa-wind"></i> Жел</div>
+      <div class="stat-val"><span id="windVal">--</span> м/с</div>
+      <div class="stat-desc" id="windDir">Бағыт: --</div>
+    </div>
+    
+    <div class="stat-card b-safe">
+      <div class="stat-head"><i class="fas fa-droplet"></i> Ылғалдылық</div>
+      <div class="stat-val"><span id="humVal">--</span>%</div>
+      <div class="stat-desc">Қалыпты деңгей</div>
+    </div>
+
+    <div class="stat-card b-safe">
+      <div class="stat-head"><i class="far fa-snowflake"></i> Қар Қалыңдығы</div>
+      <div class="stat-val"><span id="snowVal">0</span> см</div>
+      <div class="stat-desc">Жердегі жамылғы</div>
+    </div>
+
+    <div class="stat-card" id="aqiCard">
+      <div class="stat-head"><i class="fas fa-lungs"></i> Ауа Сапасы</div>
+      <div class="stat-val">PM <span id="aqiVal">--</span></div>
+      <div class="stat-desc" id="aqiDesc">CAMS Дерегі</div>
+    </div>
+  </div>
+
+  <div class="section-title"><i class="fas fa-chart-line"></i> Температура Графигі</div>
+  <div class="stat-card" style="margin-bottom:10px; padding:10px;">
+    <div class="chart-area">
+      <canvas id="tempChart"></canvas>
+    </div>
+  </div>
+
+  <div class="section-title"><i class="far fa-clock"></i> 24 Сағаттық Болжам</div>
+  <div class="h-scroll" id="hourlyList"></div>
+
+  <div class="section-title"><i class="fas fa-satellite"></i> Радар (Картаны бас: Бұлт/Қар/Жауын)</div>
+  <div class="stat-card" style="padding:0; border:none; height:220px; overflow:hidden;">
+    <div id="map"></div>
+    <div class="map-overlay" id="mapLayerName">Бұлт & Жауын-шашын</div>
+  </div>
+
+  <div class="section-title"><i class="far fa-calendar-alt"></i> 7 Күндік Толық Болжам</div>
+  <div class="d-list" id="dailyList"></div>
+
+</div>
+
+<script>
+// --- 1. DATA CONFIGURATION (Баян-Өлгий Сұмындары) ---
+const LOCATIONS = [
+  { name: "Өлгий (Орталық)", lat: 48.9707, lon: 89.9678 },
+  { name: "Алтай сұмыны", lat: 48.2970, lon: 89.5130 },
+  { name: "Алтанцөгц сұмыны", lat: 49.0550, lon: 90.5600 },
+  { name: "Баяннуур сұмыны", lat: 48.9950, lon: 91.0020 },
+  { name: "Бугат сұмыны", lat: 48.9400, lon: 90.0000 }, // Approximate center logic corrected
+  { name: "Бұлғын сұмыны", lat: 46.9167, lon: 91.0833 },
+  { name: "Буянт сұмыны", lat: 48.5160, lon: 90.2310 }, // Used generic coord
+  { name: "Дэлүүн сұмыны", lat: 47.8540, lon: 90.7320 },
+  { name: "Ногооннуур сұмыны", lat: 49.6000, lon: 90.2167 },
+  { name: "Сагсай сұмыны", lat: 48.9167, lon: 89.6500 },
+  { name: "Толбо сұмыны", lat: 48.4333, lon: 90.2333 },
+  { name: "Цагааннуур сұмыны", lat: 49.5000, lon: 89.7500 },
+  { name: "Цэнгэл сұмыны", lat: 48.9392, lon: 89.1436 },
+  { name: "Улаанхус сұмыны", lat: 49.2500, lon: 89.4000 }
+];
+
+// Нобель сыйлығының лауреаттары (Әдебиет & Философия)
+const QUOTES = [
+  { text: "Адам жеңілу үшін жаратылмаған. Адамды құртуға болады, бірақ жеңуге болмайды.", author: "Эрнест Хемингуэй" },
+  { text: "Шындық – қаншама уақыт өтсе де, ешқашан ескірмейтін жалғыз нәрсе.", author: "Габриэль Гарсиа Маркес" },
+  { text: "Болашаққа сену үшін, өткенді ұмытпау керек. Тарих – біздің ұстазымыз.", author: "Иван Бунин" },
+  { text: "Білімді болу деген сөз – белгісіздікке қарсы тұра алу.", author: "Абай Құнанбайұлы" }, // Рухани Нобель
+  { text: "Еркіндік – бұл тек құқықтар туралы емес, ол жауапкершілік туралы.", author: "Альбер Камю" },
+  { text: "Қараңғылықты қараңғылықпен жеңе алмайсың, тек жарық қана жеңе алады.", author: "Мартин Лютер Кинг" }
+];
+
+let curLoc = LOCATIONS[0];
+let weatherChart = null;
+let mapInstance = null;
+let currentMapLayer = 0; // 0: Rain/Cloud, 1: Snow, 2: Temp
+
+// --- 2. INIT ---
+document.addEventListener('DOMContentLoaded', () => {
+  const sel = document.getElementById('locSelect');
+  LOCATIONS.forEach((l, i) => {
+    let opt = document.createElement('option');
+    opt.value = i; opt.text = l.name;
+    sel.add(opt);
+  });
+  sel.addEventListener('change', (e) => {
+    curLoc = LOCATIONS[e.target.value];
+    document.getElementById('locName').innerText = curLoc.name.split(' ')[0];
+    fetchData();
+  });
+
+  // Random Quote
+  const q = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+  document.getElementById('quoteTxt').innerText = `"${q.text}"`;
+  document.getElementById('quoteAuth').innerText = "— " + q.author;
+
+  // Map Click
+  document.getElementById('map').addEventListener('click', toggleMapLayer);
+
+  initCanvas();
+  fetchData();
+});
+
+// --- 3. ROBUST DATA FETCHING (FAIL-SAFE) ---
+async function fetchData() {
+  document.getElementById('modelBadge').innerText = "Жүктелуде...";
+  
+  // 1. Алдымен ECMWF (Ең дәл)
+  let url = `https://api.open-meteo.com/v1/forecast?latitude=${curLoc.lat}&longitude=${curLoc.lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m,snow_depth,cloud_cover,sunrise,sunset&hourly=temperature_2m,precipitation,weather_code,wind_speed_10m,wind_direction_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,sunrise,sunset&timezone=auto&models=ecmwf_ifs025`;
+  
+  const aqiUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${curLoc.lat}&longitude=${curLoc.lon}&current=pm2_5&domains=cams_global`;
+
+  try {
+    // Ауа райын алу
+    let res = await fetch(url);
+    if(!res.ok) {
+      // 2. Егер ECMWF істемесе -> Auto (Best Match / GFS)
+      console.warn("ECMWF Failed, switching to Auto/GFS");
+      url = url.replace("&models=ecmwf_ifs025", ""); // Модельді алып тастасақ, Open-Meteo өзі табады
+      res = await fetch(url);
+      document.getElementById('modelBadge').innerText = "AUTO BACKUP";
+      document.getElementById('modelBadge').style.borderColor = "var(--warn)";
+    } else {
+      document.getElementById('modelBadge').innerText = "ECMWF PRO";
+      document.getElementById('modelBadge').style.borderColor = "var(--safe)";
+    }
+
+    const data = await res.json();
+    
+    // AQI алу (бөлек try/catch, ауа райы тоқтап қалмауы үшін)
+    let aqiData = null;
+    try {
+      const res2 = await fetch(aqiUrl);
+      if(res2.ok) aqiData = await res2.json();
+    } catch(e) { console.log("AQI Error"); }
+
+    renderApp(data, aqiData);
+    initMap();
+
+  } catch(e) {
+    console.error("Critical Error", e);
+    document.getElementById('wittyTxt').innerText = "Интернет жоқ сияқты! (Кеш деректері)";
+    document.getElementById('modelBadge').innerText = "OFFLINE";
+    document.getElementById('modelBadge').style.borderColor = "var(--danger)";
+  }
+}
+
+// --- 4. RENDER LOGIC ---
+function renderApp(d, a) {
+  const c = d.current;
+  const h = d.hourly;
+  const days = d.daily;
+  const pm = a ? a.current.pm2_5 : 0;
+
+  // HERO
+  document.getElementById('curTemp').innerText = Math.round(c.temperature_2m) + "°";
+  document.getElementById('feelsLike').innerText = Math.round(c.apparent_temperature);
+  document.getElementById('curCond').innerText = getWeatherDesc(c.weather_code);
+  
+  const witty = getWittyText(c.temperature_2m, c.wind_speed_10m, c.weather_code);
+  const wEl = document.getElementById('wittyTxt');
+  wEl.innerText = witty.text;
+  wEl.style.color = witty.color;
+
+  updateBackground(c.weather_code, (c.is_day !== 0)); // 0 = night
+
+  // SUN ARC
+  const sunR = new Date(c.sunrise);
+  const sunS = new Date(c.sunset);
+  document.getElementById('sunrise').innerText = sunR.toLocaleTimeString('kk-KZ', {hour:'2-digit', minute:'2-digit'});
+  document.getElementById('sunset').innerText = sunS.toLocaleTimeString('kk-KZ', {hour:'2-digit', minute:'2-digit'});
+  drawSunArc(sunR, sunS);
+
+  // STATS - Шектеулер мен Түстер
+  // Жел
+  const windS = (c.wind_speed_10m / 3.6).toFixed(1);
+  const wCard = document.getElementById('windCard');
+  const wDirText = getWindDirection(c.wind_direction_10m);
+  
+  document.getElementById('windVal').innerText = windS;
+  document.getElementById('windDir').innerHTML = `Бағыт: ${wDirText} <i class="fas fa-arrow-up" style="transform:rotate(${c.wind_direction_10m}deg)"></i>`;
+  
+  wCard.className = "stat-card " + getStatusColor(windS, 'wind');
+
+  // AQI
+  const aqCard = document.getElementById('aqiCard');
+  document.getElementById('aqiVal').innerText = Math.round(pm);
+  let aqClass = "b-safe";
+  let aqText = "Таза ауа";
+  if(pm > 35) { aqClass = "b-warn"; aqText = "Ластанған"; }
+  if(pm > 75) { aqClass = "b-danger"; aqText = "Зиянды!"; }
+  aqCard.className = "stat-card " + aqClass;
+  document.getElementById('aqiDesc').innerText = aqText;
+
+  // Қар
+  document.getElementById('snowVal').innerText = c.snow_depth || 0;
+  document.getElementById('humVal').innerText = c.relative_humidity_2m;
+
+  // CHART
+  renderChart(h.time, h.temperature_2m);
+
+  // 24H CARROT STYLE
+  let hHTML = "";
+  const nowH = new Date().getHours();
+  let startIdx = h.time.findIndex(t => parseInt(t.slice(11,13)) === nowH);
+  if(startIdx < 0) startIdx = 0;
+
+  for(let i=startIdx; i<startIdx+24; i++) {
+    if(!h.time[i]) break;
+    const t = h.time[i].slice(11,16);
+    const temp = Math.round(h.temperature_2m[i]);
+    const prev = i > 0 ? Math.round(h.temperature_2m[i-1]) : temp;
+    const wind = (h.wind_speed_10m[i]/3.6).toFixed(1);
+    
+    // Trend arrow
+    let arrow = "";
+    if(temp > prev) arrow = `<i class="fas fa-arrow-up c-warn"></i>`;
+    else if(temp < prev) arrow = `<i class="fas fa-arrow-down c-safe"></i>`;
+    
+    // Alert border
+    let border = "1px solid transparent";
+    if(wind > 10 || temp < -30) border = "1px solid var(--danger)";
+    else if(wind > 4.5 || temp < -20) border = "1px solid var(--warn)";
+
+    hHTML += `
+      <div class="h-card" style="border:${border}">
+        <span style="font-size:11px; opacity:0.7">${t}</span>
+        <span class="trend-arrow">${arrow}</span>
+        <span style="font-size:18px;">${getIcon(h.weather_code[i])}</span>
+        <span style="font-weight:700; font-size:14px;">${temp}°</span>
+        <span style="font-size:9px; margin-top:4px;"><i class="fas fa-wind"></i> ${wind}</span>
+      </div>
+    `;
+  }
+  document.getElementById('hourlyList').innerHTML = hHTML;
+
+  // 7 DAY LIST
+  let dHTML = "";
+  for(let i=0; i<7; i++) {
+    const dt = new Date(days.time[i]);
+    const dName = i===0 ? "Бүгін" : dt.toLocaleDateString('kk-KZ', {weekday:'long'});
+    const max = Math.round(days.temperature_2m_max[i]);
+    const min = Math.round(days.temperature_2m_min[i]);
+    const wMax = (days.wind_speed_10m_max[i]/3.6).toFixed(1);
+    
+    let note = "";
+    let color = "#fff";
+    
+    if(wMax > 10) { note = `<i class="fas fa-triangle-exclamation"></i> Дауыл!`; color = "var(--danger)"; }
+    else if(wMax > 4.5) { note = "Желді"; color = "var(--warn)"; }
+    else if(min < -30) { note = "Аяз!"; color = "var(--danger)"; }
+    else if(min < -20) { note = "Суық"; color = "var(--warn)"; }
+
+    dHTML += `
+      <div class="d-row">
+        <div class="d-main">
+          <div style="width:100px;">
+             <div style="font-weight:700; font-size:15px; text-transform:capitalize;">${dName}</div>
+             <div style="font-size:10px; color:${color}; font-weight:700;">${note}</div>
+          </div>
+          <div style="font-size:22px;">${getIcon(days.weather_code[i])}</div>
+          <div style="text-align:right;">
+             <span class="temp-box" style="color:#fff">К: ${max}°</span>
+             <span class="temp-box" style="color:var(--text-dim)">Т: ${min}°</span>
+          </div>
+        </div>
+        <div class="d-extra">
+           <span><i class="fas fa-wind"></i> Жел: ${wMax} м/с</span>
+           <span style="color:#4facfe"><i class="fas fa-droplet"></i> Жауын: ${days.precipitation_sum[i]} мм</span>
+        </div>
+      </div>
+    `;
+  }
+  document.getElementById('dailyList').innerHTML = dHTML;
+}
+
+// --- 5. UTILITIES ---
+
+function getStatusColor(val, type) {
+  if(type === 'wind') {
+    if(val > 10) return "b-danger";
+    if(val > 4.5) return "b-warn";
+    return "b-safe";
+  }
+  // Temp logic handled in witty text
+  return "b-safe";
+}
+
+function getWindDirection(deg) {
+  const d = ['С', 'СШ', 'Ш', 'ОШ', 'О', 'ОБ', 'Б', 'СБ'];
+  return d[Math.round(deg/45)%8];
+}
+
+function getWittyText(temp, windKmh, code) {
+  const w = windKmh / 3.6;
+  if(w > 15) return { text: "😱 Ұшып кетесің! Тас байлап ал!", color: "var(--danger)" };
+  if(temp < -35) return { text: "🥶 Сүйегің қатып қалады! Далаға шықпа!", color: "var(--danger)" };
+  if(temp < -25) return { text: "😬 Бетің үсіп кетеді, мұқият бол!", color: "var(--warn)" };
+  if(code >= 61) return { text: "☔️ Жаңбыр құйып тұр, су боласың!", color: "var(--warn)" };
+  if(w > 5) return { text: "💨 Жел шашыңды ұйпа-тұйпа қылады!", color: "var(--warn)" };
+  return { text: "😎 Ауа райы тамаша, рахаттан!", color: "var(--safe)" };
+}
+
+function getWeatherDesc(c) {
+  const map = {0:"Ашық", 1:"Аздап бұлтты", 2:"Бұлтты", 3:"Тұтас бұлтты", 45:"Тұман", 51:"Сәл жаңбыр", 61:"Жаңбыр", 71:"Қар", 95:"Найзағай"};
+  return map[c] || "Жауын";
+}
+function getIcon(c) {
+  if(c===0) return "☀️"; if(c<3) return "⛅"; if(c<50) return "☁️"; if(c<60) return "🌧"; if(c<80) return "❄️"; return "⛈";
+}
+
+// --- 6. CHART & MAP & SUN ---
+function renderChart(times, temps) {
+  const ctx = document.getElementById('tempChart').getContext('2d');
+  const nowH = new Date().getHours();
+  let idx = times.findIndex(t => parseInt(t.slice(11,13)) === nowH);
+  if(idx<0) idx=0;
+  
+  const labels = times.slice(idx, idx+24).map(t => t.slice(11,16));
+  const data = temps.slice(idx, idx+24);
+
+  if(weatherChart) weatherChart.destroy();
+  
+  const grad = ctx.createLinearGradient(0,0,0,150);
+  grad.addColorStop(0, 'rgba(48, 209, 88, 0.5)');
+  grad.addColorStop(1, 'rgba(48, 209, 88, 0.0)');
+
+  weatherChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: data,
+        borderColor: '#30d158',
+        backgroundColor: grad,
+        borderWidth: 3,
+        fill: true,
+        tension: 0.4,
+        pointRadius: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend:{display:false} },
+      scales: { x:{display:false}, y:{display:false} }
+    }
+  });
+}
+
+function initMap() {
+  if(mapInstance) mapInstance.remove();
+  mapInstance = L.map('map', {zoomControl:false, attributionControl:false}).setView([curLoc.lat, curLoc.lon], 7);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(mapInstance);
+  L.circleMarker([curLoc.lat, curLoc.lon], {color: '#30d158', radius: 5, fillOpacity:1}).addTo(mapInstance);
+  
+  updateMapLayer();
+}
+
+function toggleMapLayer() {
+  currentMapLayer = (currentMapLayer + 1) % 2; // 2 layers for now
+  updateMapLayer();
+}
+
+function updateMapLayer() {
+  // Remove existing overlays (rainviewer)
+  mapInstance.eachLayer(l => { if(l._url && l._url.includes('rainviewer')) mapInstance.removeLayer(l); });
+  
+  const ts = Math.floor(Date.now()/1000) - 600;
+  let url = `https://tile.cache.rainviewer.com/v2/radar/${ts}/256/{z}/{x}/{y}/2/1_1.png`; // Rain
+  let name = "Жауын-шашын Радары";
+  
+  if(currentMapLayer === 1) {
+    url = `https://tile.cache.rainviewer.com/v2/satellite/${ts}/256/{z}/{x}/{y}/2/1_1.png`; // Satellite (Clouds)
+    name = "Бұлттылық (Спутник)";
+  }
+  
+  L.tileLayer(url, {opacity:0.6}).addTo(mapInstance);
+  document.getElementById('mapLayerName').innerText = name;
+}
+
+function drawSunArc(rise, set) {
+    const canvas = document.getElementById('sunCanvas');
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.clearRect(0,0,w,h);
+    
+    // Draw Arc
+    ctx.beginPath();
+    ctx.arc(w/2, h, w/2.2, Math.PI, 0);
+    ctx.strokeStyle = "rgba(255,255,255,0.2)";
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    
+    // Sun Position
+    const now = new Date().getTime();
+    const r = rise.getTime();
+    const s = set.getTime();
+    
+    if(now > r && now < s) {
+        const pct = (now - r) / (s - r);
+        const angle = Math.PI + (pct * Math.PI);
+        const x = w/2 + (w/2.2) * Math.cos(angle);
+        const y = h + (w/2.2) * Math.sin(angle);
+        
+        // Sun Glow
+        ctx.beginPath();
+        ctx.arc(x, y, 8, 0, Math.PI*2);
+        ctx.fillStyle = "#ffd60a";
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = "#ffd60a";
+        ctx.fill();
+    }
+}
+
+// ANIMATIONS
+function updateBackground(code, isDay) {
+  const bg = document.getElementById('bg-layer');
+  if(!isDay) bg.style.background = "linear-gradient(180deg, #000000 0%, #1c1c1e 100%)";
+  else if(code >= 71) bg.style.background = "linear-gradient(180deg, #2c3e50 0%, #bdc3c7 100%)";
+  else if(code >= 51) bg.style.background = "linear-gradient(180deg, #16222A 0%, #3A6073 100%)";
+  else bg.style.background = "linear-gradient(180deg, #1c1c1e 0%, #000000 100%)";
+  createParticles(code >= 71 ? 'snow' : (code >= 51 ? 'rain' : null));
+}
+
+const canvas = document.getElementById('weatherCanvas');
+const ctx = canvas.getContext('2d');
+let particles = [];
+let animId;
+
+function initCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+function createParticles(type) {
+  cancelAnimationFrame(animId);
+  particles = [];
+  if(!type) { ctx.clearRect(0,0,canvas.width,canvas.height); return; }
+  for(let i=0; i<100; i++) particles.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, s: Math.random()*(type=='snow'?3:10)+2, t: type});
+  animate();
+}
+function animate() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  particles.forEach(p => {
+    ctx.beginPath();
+    p.t=='snow' ? ctx.arc(p.x,p.y,p.s/2,0,Math.PI*2) : ctx.fillRect(p.x,p.y,1,p.s);
+    ctx.fill();
+    p.y += p.s/2;
+    if(p.y > canvas.height) p.y = 0;
+  });
+  animId = requestAnimationFrame(animate);
+}
+
+</script>
+</body>
+</html>
